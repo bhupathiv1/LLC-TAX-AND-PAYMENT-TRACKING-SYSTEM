@@ -1,0 +1,66 @@
+from flask import Flask, render_template, request, jsonify, redirect
+import sqlite3
+
+app = Flask(__name__)
+
+def init_db():
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS payments (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            company TEXT,
+                            amount REAL,
+                            payment_date TEXT,
+                            status TEXT,
+                            due_date TEXT,
+                            tax_rate REAL)''')
+        conn.commit()
+
+@app.route('/')
+def index():
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payments")
+        records = cursor.fetchall()
+    return render_template("index.html", records=records)
+
+@app.route('/submit', methods=['POST'])
+def submit():
+    data = request.form
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO payments (company, amount, payment_date, status, due_date, tax_rate) VALUES (?, ?, ?, ?, ?, ?)",
+                       (data['company'], data['amount'], data['payment_date'], data['status'], data['due_date'], data['tax_rate']))
+        conn.commit()
+    return redirect('/')
+
+@app.route('/update', methods=['POST'])
+def update():
+    data = request.form
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE payments SET company=?, amount=?, payment_date=?, status=?, due_date=?, tax_rate=? WHERE id=?",
+                       (data['company'], data['amount'], data['payment_date'], data['status'], data['due_date'], data['tax_rate'], data['id']))
+        conn.commit()
+    return redirect('/')
+
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete(id):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM payments WHERE id=?", (id,))
+        conn.commit()
+    return redirect('/')
+
+@app.route('/summary', methods=['GET'])
+def summary():
+    due_date = request.args.get('due_date')
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payments WHERE due_date=?", (due_date,))
+        records = cursor.fetchall()
+    return jsonify(records)
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True)
